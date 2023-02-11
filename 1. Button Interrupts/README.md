@@ -67,3 +67,6 @@ You will take the shell code given to you in this part and need to add code wher
 - When the button is pressed, the interrupt should change which LED is blinking, and change the edge direction in the edge sensitivity register.
 - While the button is pressed the LED should stay blinking Green.
 - When the button is released, the Green LED should turn off and the Red LED should be blinking, changing the edge direction of the edge sensitivity register.
+
+TODO statements will be in comments, but also should show up as a little checklist or clipboard on the left side of your editor.
+![ToDo in CCS](https://i.gyazo.com/ed9b4529623b98bdb5b603f0a4e0c28b.png)
