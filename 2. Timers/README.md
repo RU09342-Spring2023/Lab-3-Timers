@@ -69,3 +69,83 @@ These definitions can be found in the MSP430FR2355.h file, and you can search fo
 This seems more complex, but it at its core allows you to *Capture* the current time in the counter, and also *Compare* the current time to another value. Towards the bottom, we also have a circuit which can **control a pin directly**, but more on that later.
 
 ![TB0 CCR](https://i.gyazo.com/f2f668a54df03189981ba6b275e4dbef.png)
+
+There are quite a few control signals here, but if we would like to have this thing **Alarm** us with an interrupt, to the bottom right, you can see **TBxCCRx CCIFG**. This is *Timer B X Capture Compare Register X Capture Compare Interrupt Flag*.
+
+The core of the Compare function is a **Comparator** which compares the Timer Counter within a value set in a register **TBxCCR6**. Its result can then be set to the **CCIFG** output through a Mux, controlled by the **CAP** field within the **TBxCCTLn** Register.
+
+## Using the Timer Module to Blink the LED
+
+This is starting to seem like a lot, so let's look at an example from the TI Resource Explorer. We will be looking at [msp430fr235x_tb1_05.c](https://dev.ti.com/tirex/explore/node?node=A__AF3BxGU2G61YHOGQapaPEA__msp430ware__IOGqZri__LATEST) example, which is replicated below.
+
+```c
+#include <msp430.h>
+
+int main(void)
+{
+    WDTCTL = WDTPW | WDTHOLD;                 // Stop WDT
+
+    // Configure GPIO
+    P1DIR |= BIT0;                            // Set Pin as output
+    P1OUT |= BIT0;
+
+    // Disable the GPIO power-on default high-impedance mode to activate
+    // previously configured port settings
+    PM5CTL0 &= ~LOCKLPM5;
+
+    // Timer1_B3 setup
+    TB1CCTL0 = CCIE;                          // TBCCR0 interrupt enabled
+    TB1CCR0 = 50000;
+    TB1CTL = TBSSEL_1 | MC_2;                 // ACLK, continuous mode
+
+    __bis_SR_register(LPM3_bits | GIE);       // Enter LPM3 w/ interrupt
+}
+
+// Timer B1 interrupt service routine
+#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+#pragma vector = TIMER1_B0_VECTOR
+__interrupt void Timer1_B0_ISR(void)
+#elif defined(__GNUC__)
+void __attribute__ ((interrupt(TIMER1_B0_VECTOR))) Timer1_B0_ISR (void)
+#else
+#error Compiler not supported!
+#endif
+{
+    P1OUT ^= BIT0;
+    TB1CCR0 += 50000;                         // Add Offset to TB1CCR0
+}
+```
+
+
+### Configuring the Timer
+Let's focus on the lines of code which are configuring the Timer Module.
+
+#### Enabling the Timer Interrupt: TB1CCTL0 = CCIE;
+Taking a look at the MSP430FR2355 Family User Guide, we can see what the **TB1CCTL0** register controls.
+
+![TB1CCTL0](https://i.gyazo.com/2247f89f8d5f8327e12625d741f4a69c.png)
+
+*Note:* This is a **DESTRUCTIVE ASSIGNMENT**, meaning that it will take the current contents of the **TB1CCTL0** register and obliterate all of it to zeros except for the bits in the **CCIE** Macro.
+
+#### Set the number for the counter to count to: TB1CCR0 = 50000;
+If we are going to use the Interrupt, we would like it to interrupt us when we get up to a specific number. We need to set the **TB1CCR0** register for the comparator to alert us when we hit that number. Take a look below if you want to see when the Interrupt would fire off.
+
+![TimerB Interrupt Timing](https://i.gyazo.com/4df6c91163aaa3a23b2b3f3e01d60f6c.png)
+
+#### Turning the Timer on with an ACLK source: TB1CTL = TBSSEL_1 | MC_2;
+We are doing two main configurations here. First, **MC_2** turns the Timer into Continuous mode where the counter in the Timer keeps counting up to its maximum. **TBSSEL_1** choses the internal **ACLK** which is an internal 32,768Hz clock.
+
+### Handling the Interrupt
+When the Timer counts up to 50,000, the comparator will trigger the interrupt signal, and we will be in the interrupt routine. If we want the LED to Blink every period, we do the toggle in the interrupt. And then we can increment the CCR0 register by 50,000.
+
+Essentially, you can think of it like this: the counter in the timer is like the clock we know. If I told you every 5 minutes I want you to do something and we started at 10am, the next time you should do it is 10:05am. However... do you need to know the exact time in the world... *or just that 5 minutes has passed?* Every 5 minutes, you do the thing, and then say I am going to do this again in 5 minutes. To the global counter, that is going to be interpretted as 10:10am, but to you, you just said "hey, I will do this again in 5 minutes."
+
+# Assignment: Selecting Blinking Speed from a button
+You will need to fill in the file attached to this folder to change the blinking speed of the LED between 3 different speeds when you press a button. Think of it as a controller that cycles from slow, mid, and fast, and back to slow for button presses.
+
+For the button, you can use either polling or interrupts to determine the button press, but I think you **really should be using interrupts for this**.
+
+You will need to look at the examples from part 1 and the example code presented in this part of the lab to accomplish this.
+
+## Hint: What is your button interrupt going to do?
+There are several ways you could approach this, but I would like to point specifically to the **TB1CCR0** register which controls how often the Timer Interrupt will be going off. You may want to consider how your Button Interrupt could possibly change or control that. 
