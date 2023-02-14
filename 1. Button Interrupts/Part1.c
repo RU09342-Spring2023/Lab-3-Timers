@@ -12,7 +12,7 @@
 
 char LED_Color = 0x01;                       // Global Variable to determine which LED should be blinking
 
-void gpioInit()
+void gpioInit();
 
 
 int main(void)
@@ -35,10 +35,10 @@ int main(void)
 
     while(1)
     {
-        if (LEDColor)
+        if (LED_Color)
             P1OUT ^= BIT0;                  // P1.0 = toggle
         else
-            P6OUT &= ~BIT6;                 // Set P1.0 to 0
+            P6OUT ^= BIT6;                 // P6.6 = toggle
         __delay_cycles(100000);
     }
 }
